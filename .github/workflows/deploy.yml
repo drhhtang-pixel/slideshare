@@ -54,6 +54,6 @@ jobs:
           REGION: ${{ secrets.COS_REGION }}
         run: |
           coscmd config -a "$SECRET_ID" -s "$SECRET_KEY" -b "$BUCKET" -r "$REGION"
-          for item in index.html viewer.html README.md CLAUDE.md .gitignore css img js slides; do
+          for item in index.html viewer.html README.md CLAUDE.md .gitignore css img js slides/index.json; do
             [ -e "$item" ] && coscmd upload -rs "$item" "/$item"
           done
