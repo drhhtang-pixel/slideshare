@@ -51,6 +51,7 @@ jobs:
           REGION: ${{ secrets.COS_REGION }}
         run: |
           aws configure set default.s3.addressing_style virtual
+          aws configure set default.s3.multipart_threshold 104857600
           aws s3 sync . "s3://$BUCKET/" \
             --endpoint-url "https://cos.$REGION.myqcloud.com" \
             --exclude ".git/*" \
