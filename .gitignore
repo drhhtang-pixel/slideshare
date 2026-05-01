@@ -1,0 +1,13 @@
+# Spectra SDD artifacts
+openspec/
+.spectra.yaml
+.spectra/
+
+# Claude Code
+.claude/
+
+# macOS
+.DS_Store
+
+# Python local server
+__pycache__/

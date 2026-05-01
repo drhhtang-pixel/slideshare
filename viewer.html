@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>投影片檢視器</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { width: 100%; height: 100%; background: #000; }
+
+    /* Full-viewport scroll container */
+    #pages-wrapper {
+      position: fixed;
+      inset: 0;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      background: #0a0a0a;
+    }
+
+    /* Each slide = one full viewport */
+    .page-slot {
+      width: 100%;
+      height: 100vh;
+      scroll-snap-align: start;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      position: relative;
+    }
+
+    .page-slot canvas { display: block; }
+
+    .page-num {
+      position: absolute;
+      bottom: 0.6rem;
+      right: 0.9rem;
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.2);
+      font-family: system-ui, sans-serif;
+      pointer-events: none;
+    }
+
+    /* Toolbar — fades in on mouse move */
+    #toolbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0 0.9rem;
+      height: 36px;
+      background: rgba(8,12,22,0.88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    #toolbar.show { opacity: 1; pointer-events: auto; }
+
+    .t-back {
+      color: #64748b; text-decoration: none;
+      font-size: 0.75rem; padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .t-back:hover { background: #1e293b; color: #e2e8f0; }
+
+    .t-sep { width: 1px; height: 14px; background: rgba(255,255,255,0.08); flex-shrink: 0; }
+
+    #slide-title {
+      flex: 1; font-size: 0.75rem; color: #64748b;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-family: system-ui, sans-serif;
+    }
+
+    .t-pages { display: flex; align-items: center; gap: 0.3rem; }
+
+    #page-input {
+      width: 2.4rem; text-align: center;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid #2d3f55; color: #e2e8f0;
+      border-radius: 4px; padding: 0.1rem;
+      font-size: 0.75rem; height: 20px;
+    }
+    #page-total { color: #334155; font-size: 0.75rem; }
+
+    #btn-fs {
+      background: none; border: 1px solid #2d3f55;
+      color: #475569; font-size: 0.72rem;
+      height: 20px; padding: 0 0.45rem;
+      border-radius: 4px; cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    #btn-fs:hover { background: #1e293b; color: #e2e8f0; }
+
+    /* Error — hidden by default, shown via JS style.display */
+    #error-box {
+      display: none;
+      position: fixed; inset: 0;
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 1rem; background: #000;
+      color: #f87171; font-size: 1rem;
+      font-family: system-ui, sans-serif;
+    }
+    #error-box a { color: #818cf8; text-decoration: none; font-size: 0.9rem; }
+
+    /* Exit fullscreen */
+    #btn-exit-fs {
+      display: none;
+      position: fixed; top: 0.8rem; right: 0.8rem; z-index: 200;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.12); color: #fff;
+      font-size: 0.72rem; padding: 0.28rem 0.65rem;
+      border-radius: 20px; cursor: pointer;
+    }
+    body.fs #toolbar { display: none; }
+    body.fs #btn-exit-fs { display: block; }
+  </style>
+</head>
+<body>
+
+  <div id="toolbar">
+    <a href="index.html" class="t-back">← 返回</a>
+    <div class="t-sep"></div>
+    <span id="slide-title"></span>
+    <div class="t-pages">
+      <input id="page-input" type="number" min="1" value="1">
+      <span id="page-total">/ —</span>
+    </div>
+    <div class="t-sep"></div>
+    <button id="btn-fs">⛶ 全螢幕</button>
+  </div>
+
+  <div id="pages-wrapper"></div>
+  <div id="error-box">
+    <p id="error-msg"></p>
+    <a href="index.html">← 返回列表</a>
+  </div>
+  <button id="btn-exit-fs">✕ 離開全螢幕</button>
+
+  <script src="js/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+
+    const qs        = new URLSearchParams(location.search);
+    const pdfParam  = qs.get('pdf');
+    const wrapper   = document.getElementById('pages-wrapper');
+    const toolbar   = document.getElementById('toolbar');
+    const errorBox  = document.getElementById('error-box');
+    const pageInput = document.getElementById('page-input');
+    const pageTotal = document.getElementById('page-total');
+    const btnFs     = document.getElementById('btn-fs');
+    const btnExitFs = document.getElementById('btn-exit-fs');
+
+    // Toolbar fade
+    let hideTimer;
+    document.addEventListener('mousemove', () => {
+      toolbar.classList.add('show');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => toolbar.classList.remove('show'), 2200);
+    });
+
+    // Load PDF
+    if (!pdfParam) {
+      showError('未指定 PDF 檔案。');
+    } else {
+      document.getElementById('slide-title').textContent =
+        decodeURIComponent(pdfParam).replace(/\.pdf$/i, '');
+      pdfjsLib.getDocument('slides/' + encodeURIComponent(pdfParam)).promise
+        .then(renderAll)
+        .catch(err => showError('無法載入：' + pdfParam + '（' + err.message + '）'));
+    }
+
+    function showError(msg) {
+      errorBox.style.display = 'flex';
+      document.getElementById('error-msg').textContent = msg;
+    }
+
+    async function renderAll(doc) {
+      const total = doc.numPages;
+      pageTotal.textContent = '/ ' + total;
+      pageInput.max = total;
+
+      for (let i = 1; i <= total; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'page-slot';
+        slot.dataset.page = i;
+
+        const canvas = document.createElement('canvas');
+        slot.appendChild(canvas);
+
+        const num = document.createElement('div');
+        num.className = 'page-num';
+        num.textContent = i + ' / ' + total;
+        slot.appendChild(num);
+
+        wrapper.appendChild(slot);
+
+        const page  = await doc.getPage(i);
+        const vp0   = page.getViewport({ scale: 1 });
+        const scale = Math.min(
+          window.innerWidth  / vp0.width,
+          window.innerHeight / vp0.height
+        );
+        const vp = page.getViewport({ scale });
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      }
+
+      // Track current page
+      const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) pageInput.value = e.target.dataset.page;
+        });
+      }, { root: wrapper, threshold: 0.6 });
+      wrapper.querySelectorAll('.page-slot').forEach(el => obs.observe(el));
+    }
+
+    // Jump to page
+    function jumpTo(n) {
+      const num = Math.max(1, parseInt(n, 10) || 1);
+      const el = wrapper.querySelector(`.page-slot[data-page="${num}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+    pageInput.addEventListener('change', () => jumpTo(pageInput.value));
+    pageInput.addEventListener('keydown', e => { if (e.key === 'Enter') jumpTo(pageInput.value); });
+
+    // Arrow keys
+    document.addEventListener('keydown', e => {
+      if (document.activeElement === pageInput) return;
+      const cur = parseInt(pageInput.value, 10) || 1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') jumpTo(cur + 1);
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   jumpTo(cur - 1);
+    });
+
+    // Fullscreen
+    btnFs.addEventListener('click', () =>
+      document.documentElement.requestFullscreen()
+        .then(() => document.body.classList.add('fs'))
+    );
+    btnExitFs.addEventListener('click', () => document.exitFullscreen());
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) document.body.classList.remove('fs');
+    });
+  </script>
+</body>
+</html>
