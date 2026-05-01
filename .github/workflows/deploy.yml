@@ -51,7 +51,7 @@ jobs:
           REGION: ${{ secrets.COS_REGION }}
         run: |
           aws s3 sync . "s3://$BUCKET/" \
-            --endpoint-url "https://cos.$REGION.myqcloud.com" \
+            --endpoint-url "https://$BUCKET.cos.$REGION.myqcloud.com" \
             --exclude ".git/*" \
             --exclude ".github/*" \
             --exclude "openspec/*" \
