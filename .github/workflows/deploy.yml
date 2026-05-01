@@ -50,8 +50,9 @@ jobs:
           BUCKET: ${{ secrets.COS_BUCKET }}
           REGION: ${{ secrets.COS_REGION }}
         run: |
+          aws configure set default.s3.addressing_style virtual
           aws s3 sync . "s3://$BUCKET/" \
-            --endpoint-url "https://$BUCKET.cos.$REGION.myqcloud.com" \
+            --endpoint-url "https://cos.$REGION.myqcloud.com" \
             --exclude ".git/*" \
             --exclude ".github/*" \
             --exclude "openspec/*" \
