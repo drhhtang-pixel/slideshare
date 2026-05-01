@@ -46,13 +46,12 @@ jobs:
       - name: Install coscmd
         run: pip install coscmd
 
-      - name: Configure coscmd
+      - name: Configure and Sync to COS
         env:
           SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
           SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
           BUCKET: ${{ secrets.COS_BUCKET }}
           REGION: ${{ secrets.COS_REGION }}
-        run: coscmd config -a "$SECRET_ID" -s "$SECRET_KEY" -b "$BUCKET" -r "$REGION"
-
-      - name: Sync to COS
-        run: coscmd upload -rs --delete . /
+        run: |
+          coscmd config -a "$SECRET_ID" -s "$SECRET_KEY" -b "$BUCKET" -r "$REGION"
+          coscmd upload -rs --delete . /
