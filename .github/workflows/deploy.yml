@@ -54,4 +54,4 @@ jobs:
           REGION: ${{ secrets.COS_REGION }}
         run: |
           coscmd config -a "$SECRET_ID" -s "$SECRET_KEY" -b "$BUCKET" -r "$REGION"
-          coscmd upload -rs --delete . /
+          coscmd upload -rs --ignore ".git/*,.github/*,openspec/*,.spectra*,.claude/*" . /
