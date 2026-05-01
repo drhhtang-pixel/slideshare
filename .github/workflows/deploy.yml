@@ -43,21 +43,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Sync to COS via AWS CLI (S3-compatible)
+      - name: Install coscmd
+        run: pip install coscmd
+
+      - name: Sync to COS
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.TENCENT_SECRET_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
+          SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
+          SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
           BUCKET: ${{ secrets.COS_BUCKET }}
           REGION: ${{ secrets.COS_REGION }}
         run: |
-          aws configure set default.s3.addressing_style virtual
-          aws configure set default.s3.multipart_threshold 104857600
-          aws s3 sync . "s3://$BUCKET/" \
-            --endpoint-url "https://cos.$REGION.myqcloud.com" \
-            --exclude ".git/*" \
-            --exclude ".github/*" \
-            --exclude "openspec/*" \
-            --exclude ".spectra*" \
-            --exclude ".claude/*" \
-            --delete \
-            --no-progress
+          coscmd config -a "$SECRET_ID" -s "$SECRET_KEY" -b "$BUCKET" -r "$REGION"
+          for item in index.html viewer.html README.md CLAUDE.md .gitignore css img js slides; do
+            [ -e "$item" ] && coscmd upload -rs "$item" "/$item"
+          done
