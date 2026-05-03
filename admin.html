@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>投影片管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f4f6f8;
+      color: #1a1a2e;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: #1a1a2e;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .nav-logo-icon {
+      width: 32px; height: 32px;
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .nav-logo-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .nav-logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .nav-logo-text span { color: #00a0dc; }
+
+    .nav-badge {
+      margin-left: 0.75rem;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #f87171;
+      background: rgba(248,113,113,0.15);
+      padding: 0.2rem 0.55rem;
+      border-radius: 3px;
+      border: 1px solid rgba(248,113,113,0.3);
+    }
+
+    /* ── Centered card layout ── */
+    .page-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 56px);
+      padding: 2rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.06);
+      padding: 2rem 2.5rem;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 0.35rem;
+    }
+
+    .card-sub {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Form elements ── */
+    .field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+
+    label { font-size: 0.78rem; font-weight: 600; color: #475569; }
+
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: 0.6rem 0.85rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      color: #1a1a2e;
+      background: #f8fafc;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #0077b5;
+      box-shadow: 0 0 0 3px rgba(0,119,181,0.12);
+      background: #fff;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      background: #0077b5;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 0.25rem;
+    }
+
+    .btn-primary:hover { background: #005f8e; }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .error-inline {
+      font-size: 0.78rem;
+      color: #f87171;
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    /* ── Admin panel ── */
+    .admin-wrap {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 2rem 2rem 4rem;
+    }
+
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .admin-title { font-size: 1.05rem; font-weight: 700; color: #1a1a2e; }
+    .admin-sub { font-size: 0.82rem; color: #94a3b8; }
+
+    .btn-ghost {
+      padding: 0.38rem 0.85rem;
+      background: none;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      color: #64748b;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+
+    .btn-ghost:hover { background: #f1f5f9; color: #1a1a2e; }
+
+    /* Error banner */
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      color: #b91c1c;
+      font-size: 0.82rem;
+      padding: 0.65rem 1rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    /* Slide list */
+    .slide-list {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+
+    .slide-row {
+      display: flex;
+      align-items: center;
+      padding: 0.85rem 1.2rem;
+      border-bottom: 1px solid #f1f5f9;
+      gap: 1rem;
+    }
+
+    .slide-row:last-child { border-bottom: none; }
+
+    .slide-name {
+      flex: 1;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #1a1a2e;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .slide-name.is-hidden {
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+
+    .status-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.18rem 0.5rem;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .status-badge.visible {
+      color: #059669;
+      background: #ecfdf5;
+    }
+
+    .status-badge.hidden {
+      color: #94a3b8;
+      background: #f1f5f9;
+    }
+
+    .btn-toggle {
+      padding: 0.32rem 0.85rem;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.12s, opacity 0.12s;
+    }
+
+    .btn-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-toggle.hide { background: #fee2e2; color: #b91c1c; }
+    .btn-toggle.hide:hover:not(:disabled) { background: #fecaca; }
+
+    .btn-toggle.restore { background: #dbeafe; color: #1d4ed8; }
+    .btn-toggle.restore:hover:not(:disabled) { background: #bfdbfe; }
+
+    .empty-state {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      padding: 3rem 0;
+    }
+
+    .loading-state {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      padding: 2.5rem 0;
+    }
+
+    @media (max-width: 600px) {
+      .admin-wrap { padding: 1.5rem 1rem 3rem; }
+      .navbar { padding: 0 1rem; }
+      .card { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="index.html" class="nav-logo">
+      <div class="nav-logo-icon"><img src="img/ditllogo.png" alt="DITL"></div>
+      <span class="nav-logo-text">DITL<span>DESIGN</span></span>
+    </a>
+    <span class="nav-badge">ADMIN</span>
+  </nav>
+
+  <!-- ① Password gate -->
+  <div id="gate" class="page-center">
+    <div class="card">
+      <div class="card-title">管理員驗證</div>
+      <div class="card-sub">請輸入密碼以進入投影片管理介面</div>
+      <form id="pw-form">
+        <div class="field">
+          <label for="pw-input">密碼</label>
+          <input type="password" id="pw-input" autocomplete="current-password" autofocus>
+        </div>
+        <button type="submit" class="btn-primary">解鎖</button>
+        <p id="pw-error" class="error-inline">密碼錯誤，請再試一次</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ② PAT input (shown after password, only if no stored PAT) -->
+  <div id="pat-section" class="page-center" style="display:none">
+    <div class="card">
+      <div class="card-title">GitHub Personal Access Token</div>
+      <div class="card-sub">需要具備 <strong>contents: write</strong> 權限的 PAT，用於更新 slides/index.json</div>
+      <div class="field">
+        <label for="pat-input">Personal Access Token</label>
+        <input type="text" id="pat-input" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+      </div>
+      <button id="pat-save" class="btn-primary">儲存並繼續</button>
+      <p id="pat-error" class="error-inline">請輸入有效的 Token</p>
+    </div>
+  </div>
+
+  <!-- ③ Admin panel -->
+  <div id="admin" style="display:none">
+    <div class="admin-wrap">
+      <div class="admin-header">
+        <div>
+          <div class="admin-title">投影片管理</div>
+          <div class="admin-sub">隱藏或還原投影片（變更即時寫入 GitHub）</div>
+        </div>
+        <button id="pat-clear" class="btn-ghost">清除 PAT</button>
+      </div>
+
+      <div id="error-banner" class="error-banner"></div>
+
+      <div id="slide-list" class="slide-list">
+        <div class="loading-state">載入中…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const HASH  = '5aed6c90617475e81a283a1464759c51bdaf469b6d5ec4c09780b4777c122e1e';
+    const OWNER = 'drhhtang-pixel';
+    const REPO  = 'slideshare';
+    const PAT_KEY = 'slideshare_pat';
+    const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}/contents/slides/index.json`;
+
+    let authenticated = false; // tab-session flag
+    let currentSha    = null;
+    let visibleSlides = []; // current index.json content
+    let sessionHidden = []; // slides hidden this session (for restore)
+
+    // ── Utilities ──────────────────────────────────────────────────────────
+
+    async function sha256hex(str) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function b64Decode(b64) {
+      const bin = atob(b64.replace(/\n/g, ''));
+      const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    function b64Encode(str) {
+      const bytes = new TextEncoder().encode(str);
+      const bin = Array.from(bytes, b => String.fromCharCode(b)).join('');
+      return btoa(bin);
+    }
+
+    function showBanner(msg) {
+      const el = document.getElementById('error-banner');
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.style.display = 'none'; }, 6000);
+    }
+
+    // ── GitHub API ─────────────────────────────────────────────────────────
+
+    function pat() { return localStorage.getItem(PAT_KEY); }
+
+    function apiHeaders() {
+      return {
+        Authorization: `token ${pat()}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      };
+    }
+
+    async function apiGet() {
+      const res = await fetch(API_BASE, { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`GET ${res.status}`);
+      const data = await res.json();
+      currentSha = data.sha;
+      return JSON.parse(b64Decode(data.content));
+    }
+
+    async function apiPutOnce(slides, message) {
+      const res = await fetch(API_BASE, {
+        method: 'PUT',
+        headers: apiHeaders(),
+        body: JSON.stringify({
+          message,
+          content: b64Encode(JSON.stringify(slides, null, 2)),
+          sha: currentSha
+        })
+      });
+      return res;
+    }
+
+    async function apiPut(slides, message) {
+      const res = await apiPutOnce(slides, message);
+
+      if (res.status === 409) {
+        // Re-fetch fresh sha and retry once (index.json SHA kept in sync)
+        await apiGet();
+        const retry = await apiPutOnce(slides, message);
+        if (!retry.ok) throw new Error(`PUT retry failed: ${retry.status}`);
+        const retryData = await retry.json();
+        currentSha = retryData.content.sha;
+        return;
+      }
+
+      if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
+      const data = await res.json();
+      currentSha = data.content.sha;
+    }
+
+    // ── Auth flow ──────────────────────────────────────────────────────────
+
+    document.getElementById('pw-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = '驗證中…';
+
+      const hash = await sha256hex(document.getElementById('pw-input').value);
+
+      if (hash === HASH) {
+        authenticated = true;
+        document.getElementById('pw-error').style.display = 'none';
+        document.getElementById('gate').style.display = 'none';
+        checkPat();
+      } else {
+        document.getElementById('pw-error').style.display = 'block';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+        btn.disabled = false;
+        btn.textContent = '解鎖';
+      }
+    });
+
+    function checkPat() {
+      if (pat()) {
+        enterAdmin();
+      } else {
+        document.getElementById('pat-section').style.display = 'flex';
+      }
+    }
+
+    document.getElementById('pat-save').addEventListener('click', () => {
+      const val = document.getElementById('pat-input').value.trim();
+      if (!val) {
+        document.getElementById('pat-error').style.display = 'block';
+        return;
+      }
+      document.getElementById('pat-error').style.display = 'none';
+      localStorage.setItem(PAT_KEY, val);
+      document.getElementById('pat-section').style.display = 'none';
+      enterAdmin();
+    });
+
+    document.getElementById('pat-clear').addEventListener('click', () => {
+      localStorage.removeItem(PAT_KEY);
+      document.getElementById('admin').style.display = 'none';
+      document.getElementById('pat-input').value = '';
+      document.getElementById('pat-section').style.display = 'flex';
+    });
+
+    // ── Admin panel ────────────────────────────────────────────────────────
+
+    async function enterAdmin() {
+      document.getElementById('admin').style.display = 'block';
+      try {
+        visibleSlides = await apiGet();
+        sessionHidden = [];
+        renderList();
+      } catch (err) {
+        showBanner('載入投影片失敗：' + err.message);
+        document.getElementById('slide-list').innerHTML =
+          '<div class="empty-state">無法載入投影片列表</div>';
+      }
+    }
+
+    function renderList() {
+      const list = document.getElementById('slide-list');
+      const allSlides = [...visibleSlides, ...sessionHidden];
+
+      if (allSlides.length === 0) {
+        list.innerHTML = '<div class="empty-state">目前沒有投影片</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      allSlides.forEach(filename => {
+        const isVisible = visibleSlides.includes(filename);
+        const title = filename.replace(/\.pdf$/i, '');
+
+        const row = document.createElement('div');
+        row.className = 'slide-row';
+        row.dataset.file = filename;
+        row.innerHTML = `
+          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${filename}">${title}</span>
+          <span class="status-badge ${isVisible ? 'visible' : 'hidden'}">${isVisible ? '顯示中' : '已隱藏'}</span>
+          <button class="btn-toggle ${isVisible ? 'hide' : 'restore'}" data-file="${filename}">
+            ${isVisible ? '隱藏' : '還原'}
+          </button>`;
+        list.appendChild(row);
+      });
+
+      list.querySelectorAll('.btn-toggle').forEach(btn => {
+        btn.addEventListener('click', () => toggleSlide(btn.dataset.file, btn));
+      });
+    }
+
+    async function toggleSlide(filename, btn) {
+      const isVisible = visibleSlides.includes(filename);
+      const newVisible = isVisible
+        ? visibleSlides.filter(f => f !== filename)
+        : [...visibleSlides, filename];
+      const message = isVisible ? `admin: hide "${filename}"` : `admin: restore "${filename}"`;
+
+      btn.disabled = true;
+
+      try {
+        await apiPut(newVisible, message);
+        // Update local state only after successful commit
+        visibleSlides = newVisible;
+        if (isVisible) {
+          sessionHidden = [...sessionHidden, filename];
+        } else {
+          sessionHidden = sessionHidden.filter(f => f !== filename);
+        }
+        renderList();
+      } catch (err) {
+        showBanner((isVisible ? '隱藏' : '還原') + '失敗：' + err.message);
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
