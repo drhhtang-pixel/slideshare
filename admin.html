@@ -211,6 +211,15 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .slide-name.expanded {
+      white-space: normal;
+      overflow: visible;
+      background: #f0f7ff;
+      border-radius: 3px;
+      padding: 2px 4px;
     }
 
     .slide-name.is-hidden {
@@ -503,7 +512,7 @@
         row.className = 'slide-row';
         row.dataset.file = entry.file;
         row.innerHTML = `
-          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${entry.file}">${title}</span>${isVisible ? EYE_OPEN : EYE_OFF}
+          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${entry.file}" onclick="this.classList.toggle('expanded')">${title}</span>${isVisible ? EYE_OPEN : EYE_OFF}
           <span class="upload-time">${uploadedStr}</span>
           <button class="btn-toggle hide" data-file="${entry.file}" data-action="hide"${isVisible ? '' : ' disabled'}>隱藏</button>
           <button class="btn-toggle restore" data-file="${entry.file}" data-action="restore"${isVisible ? ' disabled' : ''}>還原</button>`;
