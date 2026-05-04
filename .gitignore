@@ -6,8 +6,16 @@ openspec/
 # Claude Code
 .claude/
 
+# Original slide source files (stay local, PDFs are pushed instead)
+slides/*.key
+slides/*.pptx
+
+# Local publish log
+slides/publish-slides.log
+
 # macOS
 .DS_Store
 
 # Python local server
 __pycache__/
+openspec/.vector-search.db*

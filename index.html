@@ -311,22 +311,23 @@
     fetch('slides/index.json')
       .then(r => r.json())
       .then(files => {
-        if (!files || files.length === 0) {
+        const visible = (files || []).filter(e => e.hidden !== true);
+        if (visible.length === 0) {
           document.getElementById('empty-msg').style.display = 'block';
           return;
         }
 
-        document.getElementById('nav-count').textContent = files.length + ' 份簡報';
-        document.getElementById('section-sub').textContent = files.length + ' 份';
+        document.getElementById('nav-count').textContent = visible.length + ' 份簡報';
+        document.getElementById('section-sub').textContent = visible.length + ' 份';
 
         const grid = document.getElementById('slide-grid');
 
-        files.forEach(filename => {
-          const title = filename.replace(/\.pdf$/i, '');
+        visible.forEach(entry => {
+          const title = (entry.title && entry.title.trim()) ? entry.title : entry.file.replace(/\.pdf$/i, '');
 
           const card = document.createElement('a');
           card.className = 'slide-card';
-          card.href = `viewer.html?pdf=${encodeURIComponent(filename)}`;
+          card.href = `viewer.html?pdf=${encodeURIComponent(entry.file)}`;
 
           // Thumb
           const thumb = document.createElement('div');
@@ -353,7 +354,7 @@
           grid.appendChild(card);
 
           // Render thumbnail after layout
-          requestAnimationFrame(() => renderThumb(canvas, filename));
+          requestAnimationFrame(() => renderThumb(canvas, entry.file));
         });
       })
       .catch(() => {

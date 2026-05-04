@@ -224,26 +224,6 @@
       flex-shrink: 0;
     }
 
-    .status-badge {
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 0.18rem 0.5rem;
-      border-radius: 3px;
-      flex-shrink: 0;
-    }
-
-    .status-badge.visible {
-      color: #059669;
-      background: #ecfdf5;
-    }
-
-    .status-badge.hidden {
-      color: #94a3b8;
-      background: #f1f5f9;
-    }
-
     .btn-toggle {
       padding: 0.32rem 0.85rem;
       border: none;
@@ -353,8 +333,7 @@
 
     let authenticated = false; // tab-session flag
     let currentSha    = null;
-    let visibleSlides = []; // current index.json content
-    let sessionHidden = []; // slides hidden this session (for restore)
+    let allEntries    = []; // full index.json content (includes hidden entries)
 
     // ── Utilities ──────────────────────────────────────────────────────────
 
@@ -490,8 +469,7 @@
     async function enterAdmin() {
       document.getElementById('admin').style.display = 'block';
       try {
-        visibleSlides = await apiGet();
-        sessionHidden = [];
+        allEntries = await apiGet();
         renderList();
       } catch (err) {
         showBanner('載入投影片失敗：' + err.message);
@@ -500,19 +478,23 @@
       }
     }
 
+    const EYE_OPEN = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0077aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;vertical-align:middle;margin-left:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    const EYE_OFF  = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;vertical-align:middle;margin-left:4px"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
     function renderList() {
       const list = document.getElementById('slide-list');
-      const allSlides = [...visibleSlides, ...sessionHidden];
 
-      if (allSlides.length === 0) {
+      if (allEntries.length === 0) {
         list.innerHTML = '<div class="empty-state">目前沒有投影片</div>';
         return;
       }
 
       list.innerHTML = '';
-      allSlides.forEach(entry => {
-        const isVisible = visibleSlides.some(e => e.file === entry.file);
-        const title = entry.title;
+      allEntries.forEach(entry => {
+        const isVisible = entry.hidden !== true;
+        const title = (entry.title && entry.title.trim())
+          ? entry.title
+          : entry.file.replace(/\.pdf$/i, '');
         const uploadedStr = entry.uploaded
           ? entry.uploaded.slice(0, 16).replace('T', ' ')
           : '';
@@ -521,42 +503,32 @@
         row.className = 'slide-row';
         row.dataset.file = entry.file;
         row.innerHTML = `
-          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${entry.file}">${title}</span>
+          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${entry.file}">${title}${isVisible ? EYE_OPEN : EYE_OFF}</span>
           <span class="upload-time">${uploadedStr}</span>
-          <span class="status-badge ${isVisible ? 'visible' : 'hidden'}">${isVisible ? '顯示中' : '已隱藏'}</span>
-          <button class="btn-toggle ${isVisible ? 'hide' : 'restore'}" data-file="${entry.file}">
-            ${isVisible ? '隱藏' : '還原'}
-          </button>`;
+          <button class="btn-toggle hide" data-file="${entry.file}" data-action="hide"${isVisible ? '' : ' disabled'}>隱藏</button>
+          <button class="btn-toggle restore" data-file="${entry.file}" data-action="restore"${isVisible ? ' disabled' : ''}>還原</button>`;
         list.appendChild(row);
       });
 
-      list.querySelectorAll('.btn-toggle').forEach(btn => {
-        btn.addEventListener('click', () => toggleSlide(btn.dataset.file, btn));
+      list.querySelectorAll('.btn-toggle:not([disabled])').forEach(btn => {
+        btn.addEventListener('click', () => toggleSlide(btn.dataset.file, btn.dataset.action, btn));
       });
     }
 
-    async function toggleSlide(file, btn) {
-      const entry = [...visibleSlides, ...sessionHidden].find(e => e.file === file);
-      const isVisible = visibleSlides.some(e => e.file === file);
-      const newVisible = isVisible
-        ? visibleSlides.filter(e => e.file !== file)
-        : [...visibleSlides, entry];
-      const message = isVisible ? `admin: hide "${file}"` : `admin: restore "${file}"`;
+    async function toggleSlide(file, action, btn) {
+      const entry = allEntries.find(e => e.file === file);
+      const prevHidden = entry.hidden;
+      entry.hidden = (action === 'hide');
+      const message = action === 'hide' ? `admin: hide "${file}"` : `admin: restore "${file}"`;
 
       btn.disabled = true;
 
       try {
-        await apiPut(newVisible, message);
-        // Update local state only after successful commit
-        visibleSlides = newVisible;
-        if (isVisible) {
-          sessionHidden = [...sessionHidden, entry];
-        } else {
-          sessionHidden = sessionHidden.filter(e => e.file !== file);
-        }
+        await apiPut(allEntries, message);
         renderList();
       } catch (err) {
-        showBanner((isVisible ? '隱藏' : '還原') + '失敗：' + err.message);
+        entry.hidden = prevHidden; // rollback
+        showBanner((action === 'hide' ? '隱藏' : '還原') + '失敗：' + err.message);
         btn.disabled = false;
       }
     }

@@ -13,14 +13,9 @@ https://drhhtang-pixel.github.io/slideshare/
 ## 新增投影片步驟
 
 1. 將 PDF 檔案複製到 `slides/` 目錄
-2. 編輯 `slides/index.json`，在陣列中加入新檔名：
-   ```json
-   [
-     "既有檔案.pdf",
-     "新增檔案.pdf"
-   ]
-   ```
-3. 執行 git commit 並推送到 main 分支，GitHub Actions 會自動部署
+2. 雙擊 Dock 上的 **PublishSlides** 圖示
+
+系統會自動更新投影片清單、上傳至騰訊雲 COS、推送至 GitHub，並顯示通知告知完成。
 
 ## 本機預覽
 
