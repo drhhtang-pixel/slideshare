@@ -218,6 +218,12 @@
       text-decoration: line-through;
     }
 
+    .upload-time {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+
     .status-badge {
       font-size: 0.68rem;
       font-weight: 700;
@@ -325,7 +331,7 @@
       <div class="admin-header">
         <div>
           <div class="admin-title">投影片管理</div>
-          <div class="admin-sub">隱藏或還原投影片（變更即時寫入 GitHub）</div>
+          <div class="admin-sub">隱藏或還原投影片（變更即時寫入 GitHub）；可直接修改顯示名稱，不會影響資料夾內的實際檔名</div>
         </div>
         <button id="pat-clear" class="btn-ghost">清除 PAT</button>
       </div>
@@ -504,17 +510,21 @@
       }
 
       list.innerHTML = '';
-      allSlides.forEach(filename => {
-        const isVisible = visibleSlides.includes(filename);
-        const title = filename.replace(/\.pdf$/i, '');
+      allSlides.forEach(entry => {
+        const isVisible = visibleSlides.some(e => e.file === entry.file);
+        const title = entry.title;
+        const uploadedStr = entry.uploaded
+          ? entry.uploaded.slice(0, 16).replace('T', ' ')
+          : '';
 
         const row = document.createElement('div');
         row.className = 'slide-row';
-        row.dataset.file = filename;
+        row.dataset.file = entry.file;
         row.innerHTML = `
-          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${filename}">${title}</span>
+          <span class="slide-name${isVisible ? '' : ' is-hidden'}" title="${entry.file}">${title}</span>
+          <span class="upload-time">${uploadedStr}</span>
           <span class="status-badge ${isVisible ? 'visible' : 'hidden'}">${isVisible ? '顯示中' : '已隱藏'}</span>
-          <button class="btn-toggle ${isVisible ? 'hide' : 'restore'}" data-file="${filename}">
+          <button class="btn-toggle ${isVisible ? 'hide' : 'restore'}" data-file="${entry.file}">
             ${isVisible ? '隱藏' : '還原'}
           </button>`;
         list.appendChild(row);
@@ -525,12 +535,13 @@
       });
     }
 
-    async function toggleSlide(filename, btn) {
-      const isVisible = visibleSlides.includes(filename);
+    async function toggleSlide(file, btn) {
+      const entry = [...visibleSlides, ...sessionHidden].find(e => e.file === file);
+      const isVisible = visibleSlides.some(e => e.file === file);
       const newVisible = isVisible
-        ? visibleSlides.filter(f => f !== filename)
-        : [...visibleSlides, filename];
-      const message = isVisible ? `admin: hide "${filename}"` : `admin: restore "${filename}"`;
+        ? visibleSlides.filter(e => e.file !== file)
+        : [...visibleSlides, entry];
+      const message = isVisible ? `admin: hide "${file}"` : `admin: restore "${file}"`;
 
       btn.disabled = true;
 
@@ -539,9 +550,9 @@
         // Update local state only after successful commit
         visibleSlides = newVisible;
         if (isVisible) {
-          sessionHidden = [...sessionHidden, filename];
+          sessionHidden = [...sessionHidden, entry];
         } else {
-          sessionHidden = sessionHidden.filter(f => f !== filename);
+          sessionHidden = sessionHidden.filter(e => e.file !== file);
         }
         renderList();
       } catch (err) {
