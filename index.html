@@ -91,7 +91,7 @@
 
     /* ── Main ── */
     .main {
-      max-width: 1280px;
+      max-width: 1720px;
       margin: 0 auto;
       padding: 2.5rem 2rem 4rem;
     }
@@ -117,7 +117,7 @@
     /* ── Grid ── */
     .slide-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 1.5rem;
     }
 
@@ -147,12 +147,14 @@
       overflow: hidden;
     }
 
-    .card-thumb canvas {
+    .card-thumb canvas,
+    .card-thumb img {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
     }
 
     /* Hover overlay */
@@ -284,82 +286,96 @@
     <p id="empty-msg" class="empty-msg" style="display:none">目前沒有投影片</p>
   </main>
 
-  <script src="js/pdf.min.js"></script>
+  <script src="js/pdf.min.js" defer></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+    document.addEventListener('DOMContentLoaded', function() {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
 
-    async function renderThumb(canvas, filename) {
-      const thumb = canvas.parentElement;
-      try {
-        const doc  = await pdfjsLib.getDocument('slides/' + encodeURIComponent(filename)).promise;
-        const page = await doc.getPage(1);
-        const vp0  = page.getViewport({ scale: 1 });
-        // fit into 16:9 container
-        const W = thumb.clientWidth  || 320;
-        const H = thumb.clientHeight || 180;
-        const scale = Math.max(W / vp0.width, H / vp0.height);
-        const vp = page.getViewport({ scale });
-        canvas.width  = vp.width;
-        canvas.height = vp.height;
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-        thumb.classList.remove('loading');
-      } catch (_) {
-        thumb.classList.remove('loading');
-      }
-    }
-
-    fetch('slides/index.json')
-      .then(r => r.json())
-      .then(files => {
-        const visible = (files || []).filter(e => e.hidden !== true);
-        if (visible.length === 0) {
-          document.getElementById('empty-msg').style.display = 'block';
-          return;
+      async function renderThumb(canvas, filename) {
+        const thumb = canvas.parentElement;
+        try {
+          const doc  = await pdfjsLib.getDocument('slides/' + encodeURIComponent(filename)).promise;
+          const page = await doc.getPage(1);
+          const vp0  = page.getViewport({ scale: 1 });
+          const W = thumb.clientWidth  || 320;
+          const H = thumb.clientHeight || 180;
+          const scale = Math.max(W / vp0.width, H / vp0.height);
+          const vp = page.getViewport({ scale });
+          canvas.width  = vp.width;
+          canvas.height = vp.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+          thumb.classList.remove('loading');
+        } catch (_) {
+          thumb.classList.remove('loading');
         }
+      }
 
-        document.getElementById('nav-count').textContent = visible.length + ' 份簡報';
-        document.getElementById('section-sub').textContent = visible.length + ' 份';
+      fetch('slides/index.json')
+        .then(r => r.json())
+        .then(files => {
+          const visible = (files || []).filter(e => e.hidden !== true);
+          if (visible.length === 0) {
+            document.getElementById('empty-msg').style.display = 'block';
+            return;
+          }
 
-        const grid = document.getElementById('slide-grid');
+          document.getElementById('nav-count').textContent = visible.length + ' 份簡報';
+          document.getElementById('section-sub').textContent = visible.length + ' 份';
 
-        visible.forEach(entry => {
-          const title = (entry.title && entry.title.trim()) ? entry.title : entry.file.replace(/\.pdf$/i, '');
+          const grid = document.getElementById('slide-grid');
 
-          const card = document.createElement('a');
-          card.className = 'slide-card';
-          card.href = `viewer.html?pdf=${encodeURIComponent(entry.file)}`;
+          visible.forEach(entry => {
+            const title = (entry.title && entry.title.trim()) ? entry.title : entry.file.replace(/\.pdf$/i, '');
 
-          // Thumb
-          const thumb = document.createElement('div');
-          thumb.className = 'card-thumb loading';
-          const canvas = document.createElement('canvas');
-          const overlay = document.createElement('div');
-          overlay.className = 'card-overlay';
-          overlay.innerHTML = '<span class="overlay-btn">開啟</span>';
-          thumb.appendChild(canvas);
-          thumb.appendChild(overlay);
+            const card = document.createElement('a');
+            card.className = 'slide-card';
+            card.href = `viewer.html?pdf=${encodeURIComponent(entry.file)}`;
 
-          // Body
-          const body = document.createElement('div');
-          body.className = 'card-body';
-          body.innerHTML = `
-            <div class="card-title">${title}</div>
-            <div class="card-meta">
-              <span class="card-type">PDF</span>
-              <span class="card-arrow">→</span>
-            </div>`;
+            // Thumb
+            const thumb = document.createElement('div');
+            thumb.className = 'card-thumb loading';
+            thumb.dataset.file = entry.file;
 
-          card.appendChild(thumb);
-          card.appendChild(body);
-          grid.appendChild(card);
+            const overlay = document.createElement('div');
+            overlay.className = 'card-overlay';
+            overlay.innerHTML = '<span class="overlay-btn">開啟</span>';
 
-          // Render thumbnail after layout
-          requestAnimationFrame(() => renderThumb(canvas, entry.file));
+            // Try pre-generated JPEG thumbnail; fall back to PDF.js on error
+            const thumbFile = entry.file.replace(/\.pdf$/i, '.jpg');
+            const img = document.createElement('img');
+            img.src = 'slides/thumbs/' + encodeURIComponent(thumbFile);
+            img.loading = 'lazy';
+            img.alt = '';
+            img.onload = () => thumb.classList.remove('loading');
+            img.onerror = () => {
+              img.remove();
+              const canvas = document.createElement('canvas');
+              thumb.insertBefore(canvas, overlay);
+              renderThumb(canvas, entry.file);
+            };
+
+            thumb.appendChild(img);
+            thumb.appendChild(overlay);
+
+            // Body
+            const body = document.createElement('div');
+            body.className = 'card-body';
+            body.innerHTML = `
+              <div class="card-title">${title}</div>
+              <div class="card-meta">
+                <span class="card-type">PDF</span>
+                <span class="card-arrow">→</span>
+              </div>`;
+
+            card.appendChild(thumb);
+            card.appendChild(body);
+            grid.appendChild(card);
+          });
+        })
+        .catch(() => {
+          document.getElementById('empty-msg').style.display = 'block';
         });
-      })
-      .catch(() => {
-        document.getElementById('empty-msg').style.display = 'block';
-      });
+    });
   </script>
 </body>
 </html>
